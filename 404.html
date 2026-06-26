@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rooster Club</title>
+<link rel="icon" href="https://roosterclub.co.in/favicon-32.png" />
+<style>
+  :root{--cream:#FFFCF6;--card:#FFFFFF;--ink:#2A2017;--muted:#8A744A;--gold:#B9781A;--goldd:#8A5A12;--line:#ECE0CB;--green:#1D9E75}
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#efe7d7;color:var(--ink);font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:520px;margin:0 auto;padding:18px 16px 40px}
+  .brandbar{display:flex;align-items:center;justify-content:center;gap:9px;padding:8px 0 16px}
+  .brandbar .rc{width:30px;height:30px;border-radius:50%;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;color:var(--goldd);font-size:14px}
+  .brandbar b{font-family:Georgia,serif;font-weight:600;font-size:18px;color:#3A2A1A;letter-spacing:.5px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;margin-top:14px}
+  .muted{color:var(--muted)}
+  .center{text-align:center}
+  .cta{display:block;text-align:center;background:var(--gold);color:#fff;text-decoration:none;font-weight:600;padding:14px;border-radius:14px;margin-top:16px}
+  .cta.ghost{background:transparent;color:var(--goldd);border:1.5px solid var(--line)}
+  .chip{display:inline-block;background:#F6E7C8;color:var(--goldd);border:1px solid #E2C98F;border-radius:999px;font-size:12px;font-weight:600;padding:3px 11px}
+  .tick{color:var(--green);font-weight:600}
+  .avatar{width:84px;height:84px;border-radius:50%;object-fit:cover;border:3px solid #F1E6CF;background:#F1E6CF}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px}
+  .tile{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;background:#F1E6CF}
+  .tile img{width:100%;height:100%;object-fit:cover;display:block}
+  .tile .pr{position:absolute;left:5px;bottom:5px;background:rgba(0,0,0,.66);color:#fff;font-size:11px;font-weight:600;border-radius:999px;padding:2px 7px}
+  .seal{width:64px;height:64px;border-radius:50%;background:#0f7a59;color:#eafff6;display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto 6px}
+  .row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px dotted #E3D3AE;font-size:14px}
+  .row:last-child{border-bottom:0}
+  .row .k{color:var(--muted)}
+  .row .v{text-align:right;font-weight:600}
+  h1{font-family:Georgia,serif;font-weight:600;font-size:22px;margin:10px 0 2px;text-align:center}
+  .big{font-size:30px;font-weight:700;text-align:center;margin:6px 0}
+  .skel{opacity:.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brandbar"><span class="rc">RC</span><b>Rooster Club</b></div>
+  <div id="app"><div class="card center muted">Loading…</div></div>
+  <div id="ctas">
+    <a class="cta" id="openapp" href="#">Open in the Rooster Club app</a>
+    <a class="cta ghost" id="getapp" href="https://play.google.com/store/apps/details?id=in.co.roosterclub.app">Don’t have the app? Get it free</a>
+  </div>
+</div>
+<script>
+const SB='https://tsjiazashtxoybyaknec.supabase.co';
+const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzamlhemFzaHR4b3lieWFrbmVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjEzNjEsImV4cCI6MjA5NjI5NzM2MX0.ztjN1Hp59ofJ8ZWVfyqbl81rzr-ha2pE3ceb8fqDD9U';
+const app=document.getElementById('app');
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const money=n=>'₹'+Number(n||0).toLocaleString('en-IN');
+async function rpc(fn,body){
+  const r=await fetch(SB+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok) throw new Error('http '+r.status);
+  return r.json();
+}
+const BADGES={founding_member:'Founding Member',bronze:'Bronze Seller',silver:'Silver Seller',gold_star:'Gold Star Seller',legendary:'Legendary Breeder'};
+function fmtDate(s){try{return new Date(s).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}catch(e){return''}}
+
+function notFound(msg){
+  var c=document.getElementById('ctas'); if(c) c.style.display='none';
+  app.innerHTML='<div class="card center"><div class="big">\u{1F414}</div><h1>'+(msg||'Page not found')+'</h1><p class="muted">This link doesn’t point to a Rooster Club profile or certificate.</p></div>';
+}
+
+function renderProfile(p,listings){
+  if(!p){ notFound('Breeder not found'); return; }
+  const name=esc(p.farm_name||p.full_name||'Rooster Club breeder');
+  const loc=[p.district,p.state].filter(Boolean).map(esc).join(', ');
+  const av=p.avatar_url?'<img class="avatar" src="'+esc(p.avatar_url)+'" alt="">':'<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:34px">\u{1F414}</div>';
+  let tiles='';
+  (listings||[]).forEach(l=>{
+    const ph=l.photo?'<img src="'+esc(l.photo)+'" alt="">':'<div style="display:flex;height:100%;align-items:center;justify-content:center;font-size:26px">\u{1F414}</div>';
+    tiles+='<div class="tile">'+ph+'<span class="pr">'+money(l.price)+'</span></div>';
+  });
+  app.innerHTML=
+    '<div class="card center">'+av+
+    '<h1>'+name+'</h1>'+
+    (p.badge&&BADGES[p.badge]?'<div><span class="chip">'+esc(BADGES[p.badge])+'</span></div>':'')+
+    (p.verified?'<div class="tick" style="margin-top:6px">✓ ID-verified breeder</div>':'')+
+    (loc?'<p class="muted" style="margin:8px 0 0">\u{1F4CD} '+loc+'</p>':'')+
+    (p.bio?'<p style="margin:10px 0 0">'+esc(p.bio)+'</p>':'')+
+    '<p class="muted" style="margin:10px 0 0">'+Number(p.listing_count||0)+' active listing'+(Number(p.listing_count)===1?'':'s')+(p.joined?' · on Rooster Club since '+fmtDate(p.joined):'')+'</p>'+
+    (tiles?'<div class="grid">'+tiles+'</div>':'')+
+    '</div>';
+}
+
+function renderVerify(r){
+  if(!r){ notFound('Certificate not found'); return; }
+  const ph=r.photo?'<div class="center"><img src="'+esc(r.photo)+'" alt="" style="width:120px;height:120px;object-fit:cover;border-radius:14px;border:1px solid var(--line)"></div>':'';
+  const breedRing=[r.breed,r.ring_no?'ring '+esc(r.ring_no):''].filter(Boolean).map(esc).join(' · ');
+  app.innerHTML=
+    '<div class="card">'+
+    '<div class="seal">✓</div>'+
+    '<h1>Verified sale</h1>'+
+    '<p class="center muted" style="margin:2px 0 14px">This is a genuine Rooster Club sale certificate.</p>'+
+    ph+
+    '<div style="margin-top:14px">'+
+      '<div class="row"><span class="k">Item</span><span class="v">'+esc(r.item||'Bird')+'</span></div>'+
+      (breedRing?'<div class="row"><span class="k">Breed</span><span class="v">'+breedRing+'</span></div>':'')+
+      '<div class="row"><span class="k">Sold by</span><span class="v">'+esc(r.seller||'Seller')+(r.seller_verified?' <span class="tick">✓</span>':'')+'</span></div>'+
+      (r.buyer_first?'<div class="row"><span class="k">Sold to</span><span class="v">'+esc(r.buyer_first)+'</span></div>':'')+
+      '<div class="row"><span class="k">Amount</span><span class="v">'+money(r.price)+'</span></div>'+
+      '<div class="row"><span class="k">Date</span><span class="v">'+fmtDate(r.issued_at)+'</span></div>'+
+      '<div class="row"><span class="k">Certificate</span><span class="v" style="font-family:monospace">'+esc(r.receipt_no||'')+'</span></div>'+
+      '<div class="row"><span class="k">Status</span><span class="v tick">'+(r.status==='acknowledged'?'Buyer-accepted':'Issued')+'</span></div>'+
+    '</div></div>';
+}
+
+async function route(){
+  const m=location.pathname.match(/^\/(u|v)\/(.+?)\/?$/);
+  if(!m){ notFound(); return; }
+  const kind=m[1], key=decodeURIComponent(m[2]);
+  try{
+    if(kind==='u'){
+      const [p,ls]=await Promise.all([rpc('public_profile_by_handle',{p_handle:key}),rpc('public_listings_by_handle',{p_handle:key})]);
+      renderProfile(p,ls);
+    }else{
+      renderVerify(await rpc('verify_receipt_by_code',{p_code:key}));
+    }
+  }catch(e){ app.innerHTML='<div class="card center muted">Couldn’t load this right now. Please try again.</div>'; }
+}
+
+// "Open in the app": try the roosterclub:// deep link, fall back to the Play Store.
+(function(){
+  var btn=document.getElementById('openapp'); if(!btn) return;
+  var STORE='https://play.google.com/store/apps/details?id=in.co.roosterclub.app';
+  btn.addEventListener('click',function(e){
+    e.preventDefault();
+    var deep='roosterclub://'+location.pathname.replace(/^\/+/,'');
+    var fell=false;
+    var t=setTimeout(function(){ if(!fell) window.location=STORE; },1300);
+    document.addEventListener('visibilitychange',function(){ if(document.hidden){ fell=true; clearTimeout(t); } },{once:true});
+    window.location=deep;
+  });
+})();
+
+route();
+</script>
+</body>
+</html>
