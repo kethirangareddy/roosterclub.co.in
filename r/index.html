@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Join Rooster Club</title>
+<meta name="description" content="Join me on Rooster Club — India's rooster marketplace. Free listings, zero commission.">
+<meta name="theme-color" content="#BA7517">
+<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:title" content="Join Rooster Club">
+<meta property="og:description" content="India's rooster marketplace — free listings, zero commission. Download the app and use my referral code.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://roosterclub.co.in/r/">
+<meta property="og:image" content="https://roosterclub.co.in/favicon.png">
+<meta property="og:site_name" content="Rooster Club">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Join Rooster Club">
+<meta name="twitter:description" content="India's rooster marketplace — free listings, zero commission.">
+<meta name="twitter:image" content="https://roosterclub.co.in/favicon.png">
+<style>
+  :root{ --brown:#7B3F00; --cta:#BA7517; --bg:#FBF6EF; --ink:#2C1810; --muted:#8a7458; }
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;}
+  .card{max-width:360px;width:100%;text-align:center;}
+  .logo{width:84px;height:84px;border-radius:20px;display:block;margin:0 auto 10px;box-shadow:0 4px 16px rgba(58,36,16,.12);}
+  h1{font-size:22px;margin:6px 0;color:var(--brown);}
+  p{font-size:15px;line-height:1.5;color:var(--muted);margin:6px 0 18px;}
+  .code{display:inline-block;font-weight:700;font-size:18px;letter-spacing:2px;color:var(--brown);background:#FAEEDA;border-radius:10px;padding:8px 16px;margin-bottom:18px;}
+  .btn{display:block;background:var(--cta);color:#fff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 18px;border-radius:14px;}
+  .small{font-size:12px;margin-top:14px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <img class="logo" src="/favicon.png" alt="Rooster Club" width="84" height="84">
+    <h1>Join Rooster Club</h1>
+    <p>India's rooster marketplace — free listings, zero commission.</p>
+    <div id="codeBox" class="code" style="display:none"></div>
+    <a id="get" class="btn" href="#">Get the app</a>
+    <p class="small">Opening the app… if nothing happens, tap “Get the app”.</p>
+  </div>
+</div>
+<script>
+(function(){
+  var PKG='in.co.roosterclub.app';
+  // Referral code from ?c=CODE (fallback: last path segment /r/CODE).
+  var params=new URLSearchParams(location.search);
+  var code=(params.get('c')||params.get('code')||location.pathname.split('/').filter(Boolean).pop()||'').trim();
+  if(code && code.toLowerCase()!=='r'){
+    var box=document.getElementById('codeBox');
+    box.textContent='Code: '+code; box.style.display='inline-block';
+  } else { code=''; }
+
+  // Play Store URL carries the code in the referrer for attribution (and future
+  // Install Referrer auto-fill). Deep link opens the app for installed users.
+  var store='https://play.google.com/store/apps/details?id='+PKG+
+            (code?('&referrer='+encodeURIComponent('code='+code)):'');
+  var deep='roosterclub://invite'+(code?('?code='+encodeURIComponent(code)):'');
+
+  document.getElementById('get').setAttribute('href',store);
+
+  // Try to open the installed app; fall back to the Play Store shortly after.
+  var fell=false;
+  var t=setTimeout(function(){ if(!fell) window.location=store; },1300);
+  document.addEventListener('visibilitychange',function(){ if(document.hidden){ fell=true; clearTimeout(t); } },{once:true});
+  try{ window.location=deep; }catch(e){ window.location=store; }
+})();
+</script>
+</body>
+</html>
