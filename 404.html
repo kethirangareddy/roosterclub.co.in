@@ -57,7 +57,8 @@ async function rpc(fn,body){
   if(!r.ok) throw new Error('http '+r.status);
   return r.json();
 }
-const BADGES={founding_member:'Founding Member',bronze:'Bronze Seller',silver:'Silver Seller',gold_star:'Gold Star Seller',legendary:'Legendary Breeder'};
+const BADGES={founding_member:'Founding member',bronze:'Bronze medal',silver:'Silver medal',gold_star:'Gold medal',legendary:'Legendary'};
+const LEVELS={beginner:'Beginner',expert:'Expert',master:'Master'};
 function fmtDate(s){try{return new Date(s).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}catch(e){return''}}
 
 function notFound(msg){
@@ -109,14 +110,33 @@ function renderVerify(r){
     '</div></div>';
 }
 
+function renderCert(c){
+  if(!c){ notFound('Certificate not found'); return; }
+  app.innerHTML=
+    '<div class="card">'+
+    '<div class="seal">✓</div>'+
+    '<h1>Rooster Club School certificate</h1>'+
+    '<p class="center muted" style="margin:2px 0 14px">This is a genuine certificate issued by Rooster Club School.</p>'+
+    '<div style="margin-top:14px">'+
+      '<div class="row"><span class="k">Name</span><span class="v">'+esc(c.name||'')+'</span></div>'+
+      '<div class="row"><span class="k">Level</span><span class="v">'+esc(LEVELS[c.level]||c.level)+'</span></div>'+
+      (c.district?'<div class="row"><span class="k">District</span><span class="v">'+esc(c.district)+'</span></div>':'')+
+      '<div class="row"><span class="k">Chapters passed</span><span class="v">'+Number(c.chapters_passed||0)+' of '+Number(c.chapters_total||0)+'</span></div>'+
+      '<div class="row"><span class="k">Issued</span><span class="v">'+fmtDate(c.issued_at)+'</span></div>'+
+      '<div class="row"><span class="k">Certificate</span><span class="v" style="font-family:monospace">'+esc(decodeURIComponent(location.pathname.split('/')[2]||''))+'</span></div>'+
+    '</div></div>';
+}
+
 async function route(){
-  const m=location.pathname.match(/^\/(u|v)\/(.+?)\/?$/);
+  const m=location.pathname.match(/^\/(u|v|c)\/(.+?)\/?$/);
   if(!m){ notFound(); return; }
   const kind=m[1], key=decodeURIComponent(m[2]);
   try{
     if(kind==='u'){
       const [p,ls]=await Promise.all([rpc('public_profile_by_handle',{p_handle:key}),rpc('public_listings_by_handle',{p_handle:key})]);
       renderProfile(p,ls);
+    }else if(kind==='c'){
+      renderCert(await rpc('verify_certificate',{p_cert:key}));
     }else{
       renderVerify(await rpc('verify_receipt_by_code',{p_code:key}));
     }
