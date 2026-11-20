@@ -64,7 +64,7 @@ const COMING=[
    benefits:['Green 6 × 3 ft tank with support frame','Takes about 20 g of BSF eggs'],note:'Strong tank for growing larvae at home.'},
   {slug:'bsf-crate',cat:'accessories',name:'BSF Crate',tag:'Equipment',sub:'Stackable hatching crate',size:'1 crate',img:HF+'hf_20261014_134601_3603adf9-ff8b-46ef-a9f8-a5a20befa096.png',
    benefits:['Blue stackable crate for hatching BSF eggs','Takes about 10 g of eggs'],note:'Hatch BSF eggs before moving them to the tank.'},
-  {slug:'azolla-grow-tank',cat:'accessories',name:'Azolla Grow Tank',tag:'Plastic tank',sub:'Plastic tank · 10 × 3 ft',size:'1 tank',img:IMG+'azolla.jpg',
+  {slug:'azolla-grow-tank',cat:'accessories',name:'Azolla Grow Tank',tag:'Plastic tank',sub:'Plastic tank · 10 × 3 ft',size:'1 tank',img:HF+'hf_20261014_134531_098647f3-530e-4388-b6f2-365c328f027d.png',
    benefits:['Strong plastic tank, 10 × 3 ft','Grow azolla, a fresh green feed, at home','Cuts your feed bill','Birds eat it fresh every day'],note:'Grow a fresh azolla bed for your birds in one plastic tank.'}
 ];
 const comingOf=cat=>COMING.filter(c=>c.cat===cat);
