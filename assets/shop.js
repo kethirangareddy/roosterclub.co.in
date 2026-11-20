@@ -332,7 +332,7 @@ function checkoutPage(){
     +'<p class="pay-note"><b>Cash on delivery.</b> Pay the delivery person in cash or UPI when the parcel arrives. We will call you on this number to confirm the order.</p>'
     +'<p class="err" id="err" hidden></p>'
     +'<button class="btn wide" id="place" type="submit">Place order · '+money(t.total)+'</button>'
-    +'<p class="fine">By placing the order you agree to our <a href="/terms.html">Terms</a> and <a href="/privacy.html">Privacy Policy</a>.</p>'
+    +'<p class="fine">By placing the order you agree to our <a href="/terms.html">Terms</a>, <a href="/refund-policy.html">Refund Policy</a>, <a href="/shipping-policy.html">Shipping Policy</a> and <a href="/privacy.html">Privacy Policy</a>.</p>'
     +'</form><a class="back" href="#cart">← Back to cart</a></div>';
   document.getElementById('co').onsubmit=async e=>{
     e.preventDefault();
