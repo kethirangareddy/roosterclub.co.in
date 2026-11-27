@@ -1,12 +1,15 @@
 /* Rooster Club website shop (roosterclub.co.in/shop/).
    Sections: Accessories, Apparel (display only — ordered in the app), Feed Supplements,
    Nutri Laddus, Feed. No BSF. Guest checkout, Cash on Delivery. Products and orders are the same
-   ones the app uses (Supabase). Prices, stock and delivery are always worked out again
+   ones the app uses (Supabase). Online payment goes through CCAvenue (edge function ccav-shop),
+   shown only when app_config.shop_pay.ccav_enabled is true. Prices, stock and delivery are always worked out again
    on the server by web_place_shop_order — the numbers here are for display only. */
 (function(){
 const SB='https://tsjiazashtxoybyaknec.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzamlhemFzaHR4b3lieWFrbmVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjEzNjEsImV4cCI6MjA5NjI5NzM2MX0.ztjN1Hp59ofJ8ZWVfyqbl81rzr-ha2pE3ceb8fqDD9U';
 const WA='919515369756';
+const PAY_FN=SB+'/functions/v1/ccav-shop';
+let ONLINE=null; // is online payment open (asked from the server)
 const MAX_QTY=20, FREE_DELIVERY=999, DELIVERY_FEE=49;
 const CART_KEY='rc-web-cart-v1', ORDERS_KEY='rc-web-orders-v1', ADDR_KEY='rc-web-address-v1';
 const STATES=['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry'];
@@ -297,7 +300,7 @@ function cartPage(){
       +'<div class="qty sm"><button data-id="'+esc(p.id)+'" data-d="-1" aria-label="Less">−</button><span>'+l.qty+'</span><button data-id="'+esc(p.id)+'" data-d="1" aria-label="More">+</button></div></div>'
       +'<div class="cend"><b>'+money(p.price*l.qty)+'</b><button class="link" data-rm="'+esc(p.id)+'">Remove</button></div></div>').join('')
     +sumBlock(t)
-    +'<a class="btn wide" href="#checkout">Checkout · Cash on delivery</a></div>'
+    +'<a class="btn wide" href="#checkout">Checkout</a></div>'
     +'<a class="back" href="#">← Keep shopping</a></div>';
   main.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const l=cart().find(x=>x.id===b.dataset.id);setQty(b.dataset.id,(l?l.qty:0)+Number(b.dataset.d));cartPage();});
   main.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{setQty(b.dataset.rm,0);cartPage();});
@@ -310,8 +313,9 @@ function sumBlock(t,label){
     +'<div class="tot"><span>'+(label||'Total')+'</span><span>'+money(t.total)+'</span></div></div>';
 }
 
-function checkoutPage(){
+async function checkoutPage(){
   document.title='Checkout — Rooster Club Shop';
+  if(ONLINE===null){ try{ONLINE=!!((await rpc('web_shop_pay_options',{}))||{}).online}catch(e){ONLINE=false} }
   const lines=cartLines().filter(({p})=>inStock(p));
   if(!lines.length){ location.hash='cart'; return; }
   const t=totals(lines), a=store.get(ADDR_KEY,{});
@@ -328,8 +332,11 @@ function checkoutPage(){
     +f('note','Note for us (optional)','maxlength="300"')
     +'<h2>Your order</h2>'
     +lines.map(({l,p})=>'<div class="oline"><span>'+esc(p.name)+' × '+l.qty+'</span><span>'+money(p.price*l.qty)+'</span></div>').join('')
-    +sumBlock(t,'Pay on delivery')
-    +'<p class="pay-note"><b>Cash on delivery.</b> Pay the delivery person in cash or UPI when the parcel arrives. We will call you on this number to confirm the order.</p>'
+    +sumBlock(t,'Total')
+    +(ONLINE?'<h2>Payment</h2><div class="paychoice">'
+      +'<label class="pc"><input type="radio" name="pay" value="online" checked><span><b>Pay online now</b><small>UPI, debit/credit card or net banking — secure payment by CCAvenue</small></span></label>'
+      +'<label class="pc"><input type="radio" name="pay" value="cod"><span><b>Cash on delivery</b><small>Pay the delivery person when the parcel arrives</small></span></label></div>'
+      :'<p class="pay-note"><b>Cash on delivery.</b> Pay the delivery person in cash or UPI when the parcel arrives. We will call you on this number to confirm the order.</p>')
     +'<p class="err" id="err" hidden></p>'
     +'<button class="btn wide" id="place" type="submit">Place order · '+money(t.total)+'</button>'
     +'<p class="fine">By placing the order you agree to our <a href="/terms.html">Terms</a>, <a href="/refund-policy.html">Refund Policy</a>, <a href="/shipping-policy.html">Shipping Policy</a> and <a href="/privacy.html">Privacy Policy</a>.</p>'
@@ -338,21 +345,35 @@ function checkoutPage(){
     e.preventDefault();
     const v=id=>document.getElementById(id).value.trim();
     const contact={name:v('name'),phone:v('phone'),address_line:v('address_line'),village:v('village'),mandal:v('mandal'),district:v('district'),state:v('state'),pincode:v('pincode'),note:v('note')};
+    const pc=document.querySelector('input[name=pay]:checked'), online=!!(ONLINE&&pc&&pc.value==='online');
     const err=document.getElementById('err'), btn=document.getElementById('place');
     const bad=checkContact(contact);
     if(bad){err.textContent=bad;err.hidden=false;return;}
     err.hidden=true; btn.disabled=true; btn.textContent='Placing your order…';
     store.set(ADDR_KEY,Object.assign({},contact,{note:''}));
     try{
-      const r=await rpc('web_place_shop_order',{p_items:lines.map(({l})=>({product_id:l.id,qty:l.qty})),p_contact:contact});
+      const r=await rpc('web_place_shop_order',{p_items:lines.map(({l})=>({product_id:l.id,qty:l.qty})),p_contact:Object.assign({},contact,online?{pay:'online'}:{})});
       const list=store.get(ORDERS_KEY,[]); list.unshift({token:r.token,order_no:r.order_no,at:Date.now()}); store.set(ORDERS_KEY,list.slice(0,30));
       saveCart([]); PRODUCTS=null;
+      if(online&&r.status==='awaiting_payment'){
+        btn.textContent='Opening secure payment…';
+        try{ await startPay(r.token); return; }catch(pe){ location.hash='o/'+r.token+'/failed'; return; }
+      }
       location.hash='o/'+r.token+'/new';
     }catch(ex){
       err.textContent=ex.message; err.hidden=false; btn.disabled=false; btn.textContent='Place order · '+money(t.total);
       if(ex.server){ PRODUCTS=null; await loadProducts(); }
     }
   };
+}
+
+async function startPay(token){
+  const r=await fetch(PAY_FN,{method:'POST',headers:{'Content-Type':'application/json',apikey:KEY},body:JSON.stringify({token})});
+  const b=await r.json().catch(()=>({}));
+  if(!r.ok||!b.url) throw new Error(b.error||'Online payment could not start. Please try again.');
+  const f=document.createElement('form'); f.method='POST'; f.action=b.url;
+  [['encRequest',b.encRequest],['access_code',b.access_code]].forEach(([n,v])=>{const i=document.createElement('input');i.type='hidden';i.name=n;i.value=v;f.appendChild(i);});
+  document.body.appendChild(f); f.submit();
 }
 
 function checkContact(c){
@@ -366,7 +387,8 @@ function checkContact(c){
   return '';
 }
 
-async function orderPage(token,isNew){
+async function orderPage(token,tag){
+  const isNew=tag==='new';
   document.title='Your order — Rooster Club Shop';
   main.innerHTML='<div class="wrap narrow"><p class="shop-loading">Loading your order…</p></div>';
   let o=null; try{o=await rpc('web_shop_order',{p_token:token})}catch(e){}
@@ -376,7 +398,8 @@ async function orderPage(token,isNew){
   const items=(o.items||[]).map(i=>'<div class="cline"><img src="'+esc(safeUrl(i.image_url))+'" alt=""><div class="cmid"><b>'+esc(i.name)+'</b><span>'+money(i.unit_price)+' × '+i.qty+'</span></div><div class="cend"><b>'+money(i.line_total)+'</b></div></div>').join('');
   const pay=o.pay?payBlock(o):'';
   main.innerHTML='<div class="wrap narrow">'
-    +(isNew?'<div class="placed"><b>Thank you, '+esc(o.name)+'!</b> Your order is placed. Save this page to check on it later.</div>':'')
+    +((isNew||(tag==='paid'&&o.paid))?'<div class="placed"><b>Thank you, '+esc(o.name)+'!</b> '+(o.paid?'Payment received. ':'')+'Your order is placed. Save this page to check on it later.</div>':'')
+    +(tag==='failed'&&!o.paid&&o.status==='awaiting_payment'?'<div class="paybox"><b>Payment did not go through.</b><p>No money was taken'+(o.ccav_fail_reason?' ('+esc(o.ccav_fail_reason)+')':'')+'. You can try again below.</p></div>':'')
     +'<div class="box"><div class="ohead"><div><span class="muted">Order</span><h1>'+esc(o.order_no)+'</h1></div><span class="ostatus s-'+esc(o.status)+'">'+esc((STEPS.find(s=>s[0]===o.status)||[0,o.status.replace('_',' ')])[1])+'</span></div>'
     +'<p class="otext">'+esc(STATUS_TEXT[o.status]||'')+(o.cancel_reason?' '+esc(o.cancel_reason):'')+'</p>'
     +track
@@ -390,6 +413,9 @@ async function orderPage(token,isNew){
     +'<h2>Delivering to</h2><p>'+esc(o.name)+' · mobile ending '+esc(o.phone_last4)+'<br>'+esc(o.place)+'</p>'
     +'<a class="btn ghost wide" href="https://wa.me/'+WA+'?text='+encodeURIComponent('Hi, I need help with my order '+o.order_no)+'">Help with this order on WhatsApp</a>'
     +'</div><a class="back" href="#">← Keep shopping</a></div>';
+  const pb=document.getElementById('paynow');
+  if(pb) pb.onclick=async()=>{ const er=document.getElementById('payerr'); pb.disabled=true; pb.textContent='Opening secure payment…';
+    try{ await startPay(token); }catch(ex){ er.textContent=ex.message; er.hidden=false; pb.disabled=false; pb.textContent='Pay '+money(o.total)+' now'; } };
   const f=document.getElementById('payf');
   if(f) f.onsubmit=async e=>{
     e.preventDefault(); const ref=document.getElementById('upiref').value.trim(), er=document.getElementById('payerr');
@@ -401,6 +427,12 @@ async function orderPage(token,isNew){
 function payBlock(o){
   const p=o.pay;
   if(o.status==='payment_review') return '<div class="paybox"><b>Payment reference received: '+esc(o.upi_ref||'')+'</b><p>We will confirm your order as soon as we see the money.</p></div>';
+  if(o.payment_method==='ccavenue'){
+    let by2=''; try{by2=new Date(p.pay_by).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}catch(e){}
+    if(!p.online) return '<div class="paybox"><p>Online payment is not open right now. Please WhatsApp us about this order.</p></div>';
+    return '<div class="paybox"><b>Pay '+money(o.total)+' online'+(by2?' before '+esc(by2):'')+'</b><p>UPI, card or net banking. If not paid in time, the order is cancelled.</p>'
+      +'<p class="err" id="payerr" hidden></p><button class="btn wide" id="paynow" type="button">Pay '+money(o.total)+' now</button></div>';
+  }
   if(!p.upi_id) return '<div class="paybox"><p>Online payment is not open right now. Please WhatsApp us about this order.</p></div>';
   const link='upi://pay?pa='+encodeURIComponent(p.upi_id)+'&pn='+encodeURIComponent(p.payee_name)+'&am='+o.total+'&cu=INR&tn='+encodeURIComponent(o.order_no);
   let by=''; try{by=new Date(p.pay_by).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}catch(e){}
@@ -427,7 +459,7 @@ async function route(){
   document.getElementById('navlinks').classList.remove('open');
   try{
     let m;
-    if((m=h.match(/^o\/([0-9a-f-]{36})(\/new)?$/))){ paintCartCount(); return orderPage(m[1],!!m[2]); }
+    if((m=h.match(/^o\/([0-9a-f-]{36})(?:\/(new|paid|failed))?$/))){ paintCartCount(); return orderPage(m[1],m[2]||''); }
     if(h==='orders'){ paintCartCount(); return myOrdersPage(); }
     await loadProducts();
     if((m=h.match(/^p\/([0-9a-f-]{36})$/))) productPage(m[1]);

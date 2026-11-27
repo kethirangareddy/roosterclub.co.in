@@ -173,3 +173,10 @@
 .soonnote{color:var(--muted);font-size:14px}
 .pimg{overflow:hidden}
 .pimg img{position:absolute;inset:0}
+/* payment choice (CCAvenue / COD) */
+.paychoice{display:grid;gap:10px;margin:8px 0 14px}
+.paychoice .pc{display:flex;gap:12px;align-items:flex-start;border:1.5px solid var(--amber-mid);border-radius:var(--r-md);padding:12px 14px;cursor:pointer;background:#fff}
+.paychoice .pc:has(input:checked){border-color:var(--amber, #b8701a);background:var(--amber-bg)}
+.paychoice input{margin-top:4px;accent-color:#b8701a;width:18px;height:18px}
+.paychoice b{display:block;font-size:15px}
+.paychoice small{display:block;color:#6b5a4a;font-size:13px;margin-top:2px}
