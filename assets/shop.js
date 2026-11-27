@@ -228,7 +228,7 @@ function listPage(){
 async function teePage(p){
   const a=p.apparel||{};
   main.innerHTML='<div class="wrap narrow"><p class="shop-loading">Loading…</p></div>';
-  if(ONLINE===null){ try{ONLINE=!!((await rpc('web_shop_pay_options',{}))||{}).online}catch(e){ONLINE=false} }
+  let TEES=false; try{TEES=!!((await rpc('web_shop_pay_options',{}))||{}).tees}catch(e){}
   let types=[]; try{ types=(await rpc('web_tee_options',{p_product:p.id}))||[] }catch(e){}
   types=types.filter(t=>t.price>0&&(t.colours||[]).length);
   let ti=0, ci=0, size='', qty=1;
@@ -250,9 +250,9 @@ async function teePage(p){
         +'<h2>Colour'+(c?': <span class="muted">'+esc(c.name)+'</span>':'')+'</h2><div class="swatches">'+t.colours.map((x,i)=>'<button class="sw'+(i===ci?' on':'')+'" data-c="'+i+'" title="'+esc(x.name)+'" aria-label="'+esc(x.name)+'" style="background:'+esc(/^#[0-9a-f]{3,8}$/i.test(x.hex||'')?x.hex:'#ccc')+'"></button>').join('')+'</div>'
         +'<h2>Size</h2><div class="chips">'+sizes.map(x=>'<button class="chip'+(x.size===size?' on':'')+'" data-s="'+esc(x.size)+'">'+esc(x.size)+'</button>').join('')+'</div>'
         +'<div class="buy"><div class="qty"><button data-q="-1" aria-label="Less">−</button><span id="q">'+qty+'</span><button data-q="1" aria-label="More">+</button></div>'
-        +(ONLINE?'<button class="btn" id="teebuy"'+(sz?'':' disabled')+'>'+(sz?'Buy now · '+money(t.price*qty):'Pick a size')+'</button>'
+        +(TEES?'<button class="btn" id="teebuy"'+(sz?'':' disabled')+'>'+(sz?'Buy now · '+money(t.price*qty):'Pick a size')+'</button>'
                :'<button class="btn" disabled>Orders open soon</button>')+'</div>'
-        +(ONLINE?'<p class="fine">Paid online (UPI, card or net banking). No cash on delivery for printed T-shirts.</p>'
+        +(TEES?'<p class="fine">Paid online (UPI, card or net banking). No cash on delivery for printed T-shirts.</p>'
                :'<p class="fine">Online payment opens soon. Until then you can order in the <a href="'+PLAY+'">Rooster Club app</a>.</p>'))
       +(p.description?'<p class="desc">'+esc(p.description)+'</p>':'')
       +((a.fabric||a.print||a.neck)?'<h2>Details</h2><ul class="ticks">'+[a.print,t&&t.gsm?t.gsm+' GSM':'',a.fabric,a.neck,a.made_in?'Made in '+a.made_in:''].filter(Boolean).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'')
@@ -342,13 +342,16 @@ function sumBlock(t,label){
 
 async function checkoutPage(teeMode){
   document.title='Checkout — Rooster Club Shop';
+  if(!teeMode) ONLINE=null;
   if(ONLINE===null){ try{ONLINE=!!((await rpc('web_shop_pay_options',{}))||{}).online}catch(e){ONLINE=false} }
   let lines;
   if(teeMode){
     let tee=null; try{tee=JSON.parse(sessionStorage.getItem(TEE_KEY))}catch(e){}
     if(!tee||!tee.variant_id){ location.hash=''; return; }
     lines=[{l:{id:tee.id,qty:tee.qty,variant_id:tee.variant_id},p:{name:tee.name,price:tee.price,delivery_included:true}}];
-    if(!ONLINE){ main.innerHTML='<div class="wrap narrow"><div class="box center"><h1>Online payment opens soon</h1><p class="muted">T-shirts are paid online only.</p><a class="btn" href="#p/'+esc(tee.id)+'">Back</a></div></div>'; return; }
+    let T2=false; try{T2=!!((await rpc('web_shop_pay_options',{}))||{}).tees}catch(e){}
+    if(T2) ONLINE=true; else ONLINE=null;
+    if(!T2){ main.innerHTML='<div class="wrap narrow"><div class="box center"><h1>Online payment opens soon</h1><p class="muted">T-shirts are paid online only.</p><a class="btn" href="#p/'+esc(tee.id)+'">Back</a></div></div>'; return; }
   } else {
     lines=cartLines().filter(({p})=>inStock(p));
     if(!lines.length){ location.hash='cart'; return; }
