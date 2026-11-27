@@ -180,3 +180,12 @@
 .paychoice input{margin-top:4px;accent-color:#b8701a;width:18px;height:18px}
 .paychoice b{display:block;font-size:15px}
 .paychoice small{display:block;color:#6b5a4a;font-size:13px;margin-top:2px}
+/* T-shirt picker */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+.chip{border:1.5px solid var(--amber-mid);background:#fff;border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;cursor:pointer}
+.chip small{color:#6b5a4a;margin-left:4px}
+.chip.on{border-color:#b8701a;background:var(--amber-bg);font-weight:700}
+.swatches{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 4px}
+.sw{width:34px;height:34px;border-radius:50%;border:2px solid #e6d9c6;cursor:pointer;padding:0}
+.sw.on{outline:3px solid #b8701a;outline-offset:2px}
+.btn[disabled]{opacity:.55;cursor:not-allowed}

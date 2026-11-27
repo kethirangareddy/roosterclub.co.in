@@ -1,5 +1,5 @@
 /* Rooster Club website shop (roosterclub.co.in/shop/).
-   Sections: Accessories, Apparel (display only — ordered in the app), Feed Supplements,
+   Sections: Accessories, Apparel (T-shirts: pick style/colour/size, paid online via CCAvenue only), Feed Supplements,
    Nutri Laddus, Feed. No BSF. Guest checkout, Cash on Delivery. Products and orders are the same
    ones the app uses (Supabase). Online payment goes through CCAvenue (edge function ccav-shop),
    shown only when app_config.shop_pay.ccav_enabled is true. Prices, stock and delivery are always worked out again
@@ -11,13 +11,14 @@ const WA='919515369756';
 const PAY_FN=SB+'/functions/v1/ccav-shop';
 let ONLINE=null; // is online payment open (asked from the server)
 const MAX_QTY=20, FREE_DELIVERY=999, DELIVERY_FEE=49;
+const TEE_KEY='rc-web-tee-v1';
 const CART_KEY='rc-web-cart-v1', ORDERS_KEY='rc-web-orders-v1', ADDR_KEY='rc-web-address-v1';
 const STATES=['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry'];
 const PLAY='https://play.google.com/store/apps/details?id=in.co.roosterclub.app';
 // Order of sections on the page. buy:false = shown for looking only.
 const SECTIONS=[
   {key:'accessories',title:'Accessories',sub:'Incubators, brooder kits, leg rings, BSF and azolla grow kits and more',buy:true},
-  {key:'apparel',title:'Apparel',sub:'Rooster Club T-shirts — order them in the Rooster Club app',buy:false},
+  {key:'apparel',title:'Apparel',sub:'Rooster Club T-shirts — printed for you, paid online',buy:false},
   {key:'feed_supplement',title:'Feed Supplements',sub:'Natural care for your birds: herbal blends, electrolytes, gut and liver care',buy:true},
   {key:'laddus',title:'Nutri Laddus',sub:'Traditional nutrition laddus for roosters',buy:true},
   {key:'feed',title:'Feed',sub:'Healthy, balanced feed for chicks, layers and breeders — and natural BSF larvae',buy:true}
@@ -170,7 +171,7 @@ function card(p){
   const d=det(p), b=BADGES[d.badge], tee=p.category==='apparel';
   return '<a class="pcard'+(inStock(p)||tee?'':' oos')+'" href="#p/'+esc(p.id)+'">'
     +'<div class="pimg">'+(pics(p)[0]?'<img src="'+esc(pics(p)[0])+'" alt="'+esc(p.name)+'" loading="lazy">':'')
-    +(b?'<span class="pbadge">'+esc(b)+'</span>':'')+(tee?'<span class="pbadge app">In the app</span>':(inStock(p)?'':'<span class="pbadge grey">Out of stock</span>'))+'</div>'
+    +(b?'<span class="pbadge">'+esc(b)+'</span>':'')+(tee?'<span class="pbadge app">Printed for you</span>':(inStock(p)?'':'<span class="pbadge grey">Out of stock</span>'))+'</div>'
     +'<div class="pbody"><h3>'+esc(p.name)+'</h3>'
     +((tee?(p.apparel||{}).benefit:d.subtitle)?'<p class="psub">'+esc(tee?p.apparel.benefit:d.subtitle)+'</p>':'')
     +priceBlock(p)
@@ -207,7 +208,7 @@ function listPage(){
     const items=PRODUCTS.filter(p=>p.category===sec.key), soon=comingOf(sec.key);
     return '<section class="ssec" id="sec-'+sec.key+'"><div class="shead"><h2>'+esc(sec.title)+'</h2><p>'+esc(sec.sub)+'</p></div>'
       +(items.length||soon.length?'<div class="pgrid">'+items.map(card).join('')+soon.map(soonCard).join('')+'</div>'
-        +(sec.buy?'':'<p class="appnote">T-shirts are sold in the Rooster Club app. <a href="'+PLAY+'">Get the app</a></p>')
+        +(sec.buy?'':'<p class="appnote">Pick your style, colour and size. Printed for you and paid online.</p>')
         :'<div class="soon"><b>Coming soon</b><span>We are getting these ready. <a href="https://wa.me/'+WA+'?text='+encodeURIComponent('Hi, tell me when '+sec.title+' are available in the Rooster Club Shop.')+'">Tell me when they arrive</a></span></div>')
       +'</section>';
   }).join('');
@@ -224,25 +225,51 @@ function listPage(){
   main.querySelectorAll('[data-jump]').forEach(a=>a.onclick=e=>{e.preventDefault();const t=document.getElementById(a.dataset.jump);if(t)t.scrollIntoView({behavior:'smooth'});});
 }
 
-function teePage(p){
-  const a=p.apparel||{}, imgs=pics(p);
-  const types=(a.types||[]).filter(t=>Number(t.price)>0);
-  const names={regular:'Regular fit',oversized:'Oversized',acid_oversized:'Acid wash oversized',sweatshirt:'Sweatshirt',hoodie:'Hoodie'};
-  main.innerHTML='<div class="wrap"><a class="back" href="#">← Back to the shop</a>'
+async function teePage(p){
+  const a=p.apparel||{};
+  main.innerHTML='<div class="wrap narrow"><p class="shop-loading">Loading…</p></div>';
+  if(ONLINE===null){ try{ONLINE=!!((await rpc('web_shop_pay_options',{}))||{}).online}catch(e){ONLINE=false} }
+  let types=[]; try{ types=(await rpc('web_tee_options',{p_product:p.id}))||[] }catch(e){}
+  types=types.filter(t=>t.price>0&&(t.colours||[]).length);
+  let ti=0, ci=0, size='', qty=1;
+  const imgsFor=()=>{const c=(types[ti]||{}).colours?types[ti].colours[ci]:null;const im=(c&&c.images||[]).map(safeUrl).filter(Boolean);return im.length?im:pics(p)};
+  function paint(){
+    const t=types[ti], c=t?t.colours[ci]:null, imgs=imgsFor();
+    const sizes=c?(c.sizes||[]):[], sz=sizes.find(x=>x.size===size);
+    main.innerHTML='<div class="wrap"><a class="back" href="#">← Back to the shop</a>'
     +'<div class="pdetail"><div class="gallery">'
       +'<div class="gmain"><img id="gmain" src="'+esc(imgs[0])+'" alt="'+esc(p.name)+'"></div>'
       +(imgs.length>1?'<div class="gthumbs">'+imgs.map((u,i)=>'<button class="gthumb'+(i?'':' on')+'" data-src="'+esc(u)+'"><img src="'+esc(u)+'" alt=""></button>').join('')+'</div>':'')
     +'</div><div class="pinfo">'
-      +'<span class="pbadge static app">Order in the app</span>'
+      +'<span class="pbadge static app">Printed for you · pay online</span>'
       +'<h1>'+esc(p.name)+'</h1>'
       +(a.benefit?'<p class="psub">'+esc(a.benefit)+'</p>':'')
-      +priceBlock(p,true)
-      +'<div class="appbox"><p>Rooster Club T-shirts are sold in the Rooster Club app, where you pick the style, colour and size.</p><a class="btn" href="'+PLAY+'">Get the Rooster Club app</a></div>'
+      +(t?'<div class="price big"><b>'+money(t.price)+'</b></div><p class="incl">Delivery included · printed and shipped in 5–7 days</p>':'')
+      +(!types.length?'<div class="appbox"><p>This design is not open for orders right now.</p><a class="btn" href="'+PLAY+'">Get the Rooster Club app</a></div>':
+        '<h2>Style</h2><div class="chips">'+types.map((x,i)=>'<button class="chip'+(i===ti?' on':'')+'" data-t="'+i+'">'+esc(x.label)+' <small>'+money(x.price)+'</small></button>').join('')+'</div>'
+        +'<h2>Colour'+(c?': <span class="muted">'+esc(c.name)+'</span>':'')+'</h2><div class="swatches">'+t.colours.map((x,i)=>'<button class="sw'+(i===ci?' on':'')+'" data-c="'+i+'" title="'+esc(x.name)+'" aria-label="'+esc(x.name)+'" style="background:'+esc(/^#[0-9a-f]{3,8}$/i.test(x.hex||'')?x.hex:'#ccc')+'"></button>').join('')+'</div>'
+        +'<h2>Size</h2><div class="chips">'+sizes.map(x=>'<button class="chip'+(x.size===size?' on':'')+'" data-s="'+esc(x.size)+'">'+esc(x.size)+'</button>').join('')+'</div>'
+        +'<div class="buy"><div class="qty"><button data-q="-1" aria-label="Less">−</button><span id="q">'+qty+'</span><button data-q="1" aria-label="More">+</button></div>'
+        +(ONLINE?'<button class="btn" id="teebuy"'+(sz?'':' disabled')+'>'+(sz?'Buy now · '+money(t.price*qty):'Pick a size')+'</button>'
+               :'<button class="btn" disabled>Orders open soon</button>')+'</div>'
+        +(ONLINE?'<p class="fine">Paid online (UPI, card or net banking). No cash on delivery for printed T-shirts.</p>'
+               :'<p class="fine">Online payment opens soon. Until then you can order in the <a href="'+PLAY+'">Rooster Club app</a>.</p>'))
       +(p.description?'<p class="desc">'+esc(p.description)+'</p>':'')
-      +(types.length?'<h2>Styles</h2><table class="specs">'+types.map(t=>'<tr><th>'+esc(names[t.key]||t.key)+'</th><td>'+money(t.price)+'</td></tr>').join('')+'</table>':'')
-      +((a.fabric||a.print||a.neck)?'<h2>Details</h2><ul class="ticks">'+[a.print,a.fabric,a.neck,a.made_in?'Made in '+a.made_in:''].filter(Boolean).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'')
+      +((a.fabric||a.print||a.neck)?'<h2>Details</h2><ul class="ticks">'+[a.print,t&&t.gsm?t.gsm+' GSM':'',a.fabric,a.neck,a.made_in?'Made in '+a.made_in:''].filter(Boolean).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'')
     +'</div></div></div>';
-  main.querySelectorAll('.gthumb').forEach(b=>b.onclick=()=>{document.getElementById('gmain').src=b.dataset.src;main.querySelectorAll('.gthumb').forEach(x=>x.classList.toggle('on',x===b));});
+    main.querySelectorAll('.gthumb').forEach(b=>b.onclick=()=>{document.getElementById('gmain').src=b.dataset.src;main.querySelectorAll('.gthumb').forEach(x=>x.classList.toggle('on',x===b));});
+    main.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{ti=+b.dataset.t;ci=0;size='';paint();});
+    main.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{ci=+b.dataset.c;const ok=(types[ti].colours[ci].sizes||[]).some(x=>x.size===size);if(!ok)size='';paint();});
+    main.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{size=b.dataset.s;paint();});
+    main.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{qty=Math.max(1,Math.min(5,qty+Number(b.dataset.q)));paint();});
+    const buy=document.getElementById('teebuy');
+    if(buy&&sz) buy.onclick=()=>{
+      try{sessionStorage.setItem(TEE_KEY,JSON.stringify({id:p.id,variant_id:sz.variant_id,qty,price:t.price,
+        name:p.name+' · '+t.label+' · '+c.name+' · '+sz.size,img:imgs[0]}))}catch(e){}
+      location.hash='checkout/tee';
+    };
+  }
+  paint();
 }
 
 function productPage(id){
@@ -313,11 +340,19 @@ function sumBlock(t,label){
     +'<div class="tot"><span>'+(label||'Total')+'</span><span>'+money(t.total)+'</span></div></div>';
 }
 
-async function checkoutPage(){
+async function checkoutPage(teeMode){
   document.title='Checkout — Rooster Club Shop';
   if(ONLINE===null){ try{ONLINE=!!((await rpc('web_shop_pay_options',{}))||{}).online}catch(e){ONLINE=false} }
-  const lines=cartLines().filter(({p})=>inStock(p));
-  if(!lines.length){ location.hash='cart'; return; }
+  let lines;
+  if(teeMode){
+    let tee=null; try{tee=JSON.parse(sessionStorage.getItem(TEE_KEY))}catch(e){}
+    if(!tee||!tee.variant_id){ location.hash=''; return; }
+    lines=[{l:{id:tee.id,qty:tee.qty,variant_id:tee.variant_id},p:{name:tee.name,price:tee.price,delivery_included:true}}];
+    if(!ONLINE){ main.innerHTML='<div class="wrap narrow"><div class="box center"><h1>Online payment opens soon</h1><p class="muted">T-shirts are paid online only.</p><a class="btn" href="#p/'+esc(tee.id)+'">Back</a></div></div>'; return; }
+  } else {
+    lines=cartLines().filter(({p})=>inStock(p));
+    if(!lines.length){ location.hash='cart'; return; }
+  }
   const t=totals(lines), a=store.get(ADDR_KEY,{});
   const f=(id,label,attrs)=>'<label class="fld"><span>'+label+'</span><input id="'+id+'" value="'+esc(a[id]||'')+'" '+(attrs||'')+'></label>';
   main.innerHTML='<div class="wrap narrow"><h1 class="ptitle">Delivery details</h1>'
@@ -333,28 +368,30 @@ async function checkoutPage(){
     +'<h2>Your order</h2>'
     +lines.map(({l,p})=>'<div class="oline"><span>'+esc(p.name)+' × '+l.qty+'</span><span>'+money(p.price*l.qty)+'</span></div>').join('')
     +sumBlock(t,'Total')
-    +(ONLINE?'<h2>Payment</h2><div class="paychoice">'
+    +(teeMode?'<p class="pay-note"><b>Pay online now.</b> UPI, debit/credit card or net banking — secure payment by CCAvenue. Printed T-shirts are not sent cash on delivery.</p>'
+     :ONLINE?'<h2>Payment</h2><div class="paychoice">'
       +'<label class="pc"><input type="radio" name="pay" value="online" checked><span><b>Pay online now</b><small>UPI, debit/credit card or net banking — secure payment by CCAvenue</small></span></label>'
       +'<label class="pc"><input type="radio" name="pay" value="cod"><span><b>Cash on delivery</b><small>Pay the delivery person when the parcel arrives</small></span></label></div>'
       :'<p class="pay-note"><b>Cash on delivery.</b> Pay the delivery person in cash or UPI when the parcel arrives. We will call you on this number to confirm the order.</p>')
     +'<p class="err" id="err" hidden></p>'
     +'<button class="btn wide" id="place" type="submit">Place order · '+money(t.total)+'</button>'
     +'<p class="fine">By placing the order you agree to our <a href="/terms.html">Terms</a>, <a href="/refund-policy.html">Refund Policy</a>, <a href="/shipping-policy.html">Shipping Policy</a> and <a href="/privacy.html">Privacy Policy</a>.</p>'
-    +'</form><a class="back" href="#cart">← Back to cart</a></div>';
+    +'</form><a class="back" href="'+(teeMode?'#p/'+esc(lines[0].l.id):'#cart')+'">← Back</a></div>';
   document.getElementById('co').onsubmit=async e=>{
     e.preventDefault();
     const v=id=>document.getElementById(id).value.trim();
     const contact={name:v('name'),phone:v('phone'),address_line:v('address_line'),village:v('village'),mandal:v('mandal'),district:v('district'),state:v('state'),pincode:v('pincode'),note:v('note')};
-    const pc=document.querySelector('input[name=pay]:checked'), online=!!(ONLINE&&pc&&pc.value==='online');
+    const pc=document.querySelector('input[name=pay]:checked'), online=!!(ONLINE&&(teeMode||(pc&&pc.value==='online')));
     const err=document.getElementById('err'), btn=document.getElementById('place');
     const bad=checkContact(contact);
     if(bad){err.textContent=bad;err.hidden=false;return;}
     err.hidden=true; btn.disabled=true; btn.textContent='Placing your order…';
     store.set(ADDR_KEY,Object.assign({},contact,{note:''}));
     try{
-      const r=await rpc('web_place_shop_order',{p_items:lines.map(({l})=>({product_id:l.id,qty:l.qty})),p_contact:Object.assign({},contact,online?{pay:'online'}:{})});
+      const r=await rpc('web_place_shop_order',{p_items:lines.map(({l})=>Object.assign({product_id:l.id,qty:l.qty},l.variant_id?{variant_id:l.variant_id}:{})),p_contact:Object.assign({},contact,online?{pay:'online'}:{})});
       const list=store.get(ORDERS_KEY,[]); list.unshift({token:r.token,order_no:r.order_no,at:Date.now()}); store.set(ORDERS_KEY,list.slice(0,30));
-      saveCart([]); PRODUCTS=null;
+      if(teeMode){ try{sessionStorage.removeItem(TEE_KEY)}catch(e){} } else saveCart([]);
+      PRODUCTS=null;
       if(online&&r.status==='awaiting_payment'){
         btn.textContent='Opening secure payment…';
         try{ await startPay(r.token); return; }catch(pe){ location.hash='o/'+r.token+'/failed'; return; }
@@ -465,7 +502,8 @@ async function route(){
     if((m=h.match(/^p\/([0-9a-f-]{36})$/))) productPage(m[1]);
     else if((m=h.match(/^c\/([a-z0-9-]+)$/))) soonPage(m[1]);
     else if(h==='cart') cartPage();
-    else if(h==='checkout') checkoutPage();
+    else if(h==='checkout') checkoutPage(false);
+    else if(h==='checkout/tee') checkoutPage(true);
     else listPage();
   }catch(e){
     main.innerHTML='<div class="wrap narrow"><div class="box center"><h1>The shop could not load</h1><p class="muted">Check your internet and try again.</p><button class="btn" onclick="location.reload()">Try again</button></div></div>';
