@@ -23,7 +23,10 @@ const SECTIONS=[
   {key:'laddus',title:'Nutri Laddus',sub:'Traditional nutrition laddus for roosters',buy:true},
   {key:'feed',title:'Feed',sub:'Healthy, balanced feed for chicks, layers and breeders — and natural BSF larvae',buy:true}
 ];
-const canBuy=p=>p&&p.category!=='apparel';
+// 28 Nov 2026 (Ranga): only T-shirts can be ordered for now. Everything else is for looking only.
+// To reopen, set ORDERS_OPEN=true here AND switch off the server lock (app_config shop_order_open).
+const ORDERS_OPEN=false;
+const canBuy=p=>ORDERS_OPEN&&p&&p.category!=='apparel';
 
 /* Coming soon: products being made now (mockups / labels). Shown for looking only; no price, no cart.
    When one goes live in Command Center it shows from the database instead — then delete it here. */
@@ -215,11 +218,11 @@ function listPage(){
   main.innerHTML='<section class="shop-hero"><div class="wrap">'
     +'<p class="eyebrow">Rooster Club Shop</p>'
     +'<h1>Everything for your birds, delivered to your farm</h1>'
-    +'<p class="lead"><b>Cash on delivery</b> across India. Free delivery on orders of '+money(FREE_DELIVERY)+' or more.</p>'
+    +(ORDERS_OPEN?'<p class="lead"><b>Cash on delivery</b> across India. Free delivery on orders of '+money(FREE_DELIVERY)+' or more.</p>':'<p class="lead">Rooster Club T-shirts can be ordered now. Other items open for orders soon.</p>')
     +'<nav class="chipnav">'+SECTIONS.map(sec=>'<a href="#sec-'+sec.key+'" data-jump="sec-'+sec.key+'">'+esc(sec.title)+'</a>').join('')+'</nav>'
     +'</div></section>'
     +'<div class="wrap">'+secs
-    +'<div class="trust"><div><b>Cash on delivery</b><span>Pay when the parcel reaches you</span></div>'
+    +'<div class="trust">'+(ORDERS_OPEN?'<div><b>Cash on delivery</b><span>Pay when the parcel reaches you</span></div>':'')
     +'<div><b>Sold by Rooster Club</b><span>Packed and shipped from Hyderabad</span></div>'
     +'<div><b>Help on WhatsApp</b><span><a href="https://wa.me/'+WA+'">95153 69756</a></span></div></div></div>';
   main.querySelectorAll('[data-jump]').forEach(a=>a.onclick=e=>{e.preventDefault();const t=document.getElementById(a.dataset.jump);if(t)t.scrollIntoView({behavior:'smooth'});});
@@ -289,8 +292,9 @@ function productPage(id){
       +'<h1>'+esc(p.name)+'</h1>'+(p.name_te?'<p class="te">'+esc(p.name_te)+'</p>':'')
       +(d.subtitle?'<p class="psub">'+esc(d.subtitle)+'</p>':'')
       +priceBlock(p,true)
-      +'<p class="incl">'+(p.delivery_included?'Delivery included':'Free delivery on orders of '+money(FREE_DELIVERY)+'+, else '+money(DELIVERY_FEE))+' · Cash on delivery</p>'
-      +(ok?'<div class="buy"><div class="qty"><button data-q="-1" aria-label="Less">−</button><span id="q">1</span><button data-q="1" aria-label="More">+</button></div>'
+      +'<p class="incl">'+(p.delivery_included?'Delivery included':'Free delivery on orders of '+money(FREE_DELIVERY)+'+, else '+money(DELIVERY_FEE))+(ORDERS_OPEN?' · Cash on delivery':'')+'</p>'
+      +(!ORDERS_OPEN?'<div class="appbox"><p>Orders for this item open soon. Ask us on WhatsApp and we will tell you when you can order.</p><a class="btn" href="https://wa.me/'+WA+'?text='+encodeURIComponent('Hi, please tell me when I can order '+p.name+'.')+'">Ask on WhatsApp</a></div>'
+        :ok?'<div class="buy"><div class="qty"><button data-q="-1" aria-label="Less">−</button><span id="q">1</span><button data-q="1" aria-label="More">+</button></div>'
           +'<button class="btn ghost" id="add">Add to cart</button><button class="btn" id="now">Buy now</button></div>'
           +(p.stock_count<=5?'<p class="few">Only '+p.stock_count+' left</p>':'')
         :'<p class="oosnote">Out of stock right now. <a href="https://wa.me/'+WA+'?text='+encodeURIComponent('Hi, please tell me when '+p.name+' is back in stock.')+'">Ask on WhatsApp</a></p>')
@@ -306,7 +310,7 @@ function productPage(id){
       +(d.faq&&d.faq.length?'<h2>Questions</h2>'+d.faq.map(f=>'<details class="faq"><summary>'+esc(f.q)+'</summary><p>'+esc(f.a)+'</p></details>').join(''):'')
     +'</div></div></div>';
   main.querySelectorAll('.gthumb').forEach(b=>b.onclick=()=>{document.getElementById('gmain').src=b.dataset.src;main.querySelectorAll('.gthumb').forEach(x=>x.classList.toggle('on',x===b));});
-  if(ok){
+  if(ok&&ORDERS_OPEN){
     let q=1; const qEl=document.getElementById('q');
     main.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{q=Math.max(1,Math.min(max,q+Number(b.dataset.q)));qEl.textContent=q;});
     document.getElementById('add').onclick=()=>{addToCart(p.id,q);toast('Added to cart');paintCartCount();};
