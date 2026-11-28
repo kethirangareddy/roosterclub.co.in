@@ -359,3 +359,6 @@
 .pinfo .fine{text-align:left}
 .show-sm{display:none}
 @media (max-width:640px){.announce .show-sm{display:inline}}
+
+/* Supplement jars: transparent pictures, keep the jars white (no multiply tint) */
+.pimg img[src*="/shop/img/"][src$=".webp"],.cimg img[src*="/shop/img/"][src$=".webp"],.gmain img[src*="/shop/img/"][src$=".webp"],.gthumb img[src*="/shop/img/"][src$=".webp"]{mix-blend-mode:normal}
