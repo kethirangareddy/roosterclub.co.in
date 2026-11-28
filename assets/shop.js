@@ -170,32 +170,38 @@ function priceBlock(p,big){
     +(o?'<s>'+money(p.mrp)+'</s><span class="off">'+o+'% off</span>':'')+'</div>';
 }
 
+const secOf=k=>SECTIONS.find(x=>x.key===k)||{title:'Shop',key:k};
+const teeCount=p=>((p.apparel||{}).types||[]).length;
+function rating(p){ return p.rating_count>0?'<p class="rate">'+Number(p.rating_avg).toFixed(1)+' out of 5 · '+p.rating_count+(p.rating_count===1?' review':' reviews')+'</p>':''; }
+
 function card(p){
-  const d=det(p), b=BADGES[d.badge], tee=p.category==='apparel';
+  const d=det(p), b=BADGES[d.badge], tee=p.category==='apparel', im=pics(p);
+  const tag=tee?'':(!inStock(p)?'<span class="ptag grey">Out of stock</span>':(!canBuy(p)?'<span class="ptag soft">Orders open soon</span>':''));
   return '<a class="pcard'+(inStock(p)||tee?'':' oos')+'" href="#p/'+esc(p.id)+'">'
-    +'<div class="pimg">'+(pics(p)[0]?'<img src="'+esc(pics(p)[0])+'" alt="'+esc(p.name)+'" loading="lazy">':'')
-    +(b?'<span class="pbadge">'+esc(b)+'</span>':'')+(tee?'<span class="pbadge app">Printed for you</span>':(inStock(p)?'':'<span class="pbadge grey">Out of stock</span>'))+'</div>'
+    +'<div class="pimg'+(im[1]?' two':'')+(tee?' cover':'')+'">'+(im[0]?'<img src="'+esc(im[0])+'" alt="'+esc(p.name)+'" loading="lazy">':'')
+    +(im[1]?'<img class="alt" src="'+esc(im[1])+'" alt="" loading="lazy">':'')
+    +(b?'<span class="stamp">'+esc(b)+'</span>':'')+(tee?'<span class="stamp dark">Printed for you</span>':'')+'</div>'
     +'<div class="pbody"><h3>'+esc(p.name)+'</h3>'
     +((tee?(p.apparel||{}).benefit:d.subtitle)?'<p class="psub">'+esc(tee?p.apparel.benefit:d.subtitle)+'</p>':'')
-    +priceBlock(p)
-    +(!tee&&inStock(p)&&p.stock_count<=5?'<p class="few">Only '+p.stock_count+' left</p>':'')
-    +'</div></a>';
+    +priceBlock(p)+rating(p)
+    +(!tee&&canBuy(p)&&inStock(p)&&p.stock_count<=5?'<p class="few">Only '+p.stock_count+' left</p>':'')
+    +tag+'</div></a>';
 }
 
 function soonCard(c){
   return '<a class="pcard" href="#c/'+esc(c.slug)+'">'
     +'<div class="pimg"><img src="'+esc(c.img)+'" alt="'+esc(c.name)+'" loading="lazy">'
-    +'<span class="pbadge">'+esc(c.tag)+'</span><span class="pbadge soonb">Coming soon</span></div>'
-    +'<div class="pbody"><h3>'+esc(c.name)+'</h3><p class="psub">'+esc(c.sub)+'</p><p class="soonline">'+esc(c.size)+'</p></div></a>';
+    +'<span class="stamp">'+esc(c.tag)+'</span></div>'
+    +'<div class="pbody"><h3>'+esc(c.name)+'</h3><p class="psub">'+esc(c.sub)+' · '+esc(c.size)+'</p><span class="ptag soft">Coming soon</span></div></a>';
 }
 
 function soonPage(slug){
   const c=bySlug(slug); if(!c){ location.hash=''; return; }
   document.title=c.name+' — Rooster Club Shop';
   const wa='https://wa.me/'+WA+'?text='+encodeURIComponent('Hi, please tell me when '+c.name+' is available in the Rooster Club Shop.');
-  main.innerHTML='<div class="wrap"><a class="back" href="#">← Back to the shop</a>'
+  main.innerHTML='<div class="wrap">'+crumbs(c.cat,c.name)+''
     +'<div class="pdetail"><div class="gallery"><div class="gmain"><img src="'+esc(c.img)+'" alt="'+esc(c.name)+'"></div></div><div class="pinfo">'
-      +'<span class="pbadge static">'+esc(c.tag)+'</span> <span class="pbadge static soonb">Coming soon</span>'
+      +'<span class="stamp static">'+esc(c.tag)+'</span> <span class="stamp static soft">Coming soon</span>'
       +'<h1>'+esc(c.name)+'</h1><p class="psub">'+esc(c.sub)+' · '+esc(c.size)+'</p>'
       +'<div class="appbox"><p>We are getting this ready. Ask us on WhatsApp and we will tell you as soon as it is in stock.</p><a class="btn" href="'+wa+'">Tell me when it is ready</a></div>'
       +(c.benefits&&c.benefits.length?'<h2>'+(c.cat==='accessories'?'What you get':'Key benefits')+'</h2><ul class="ticks">'+c.benefits.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'')
@@ -205,26 +211,87 @@ function soonPage(slug){
     +'</div></div></div>';
 }
 
+
+function crumbs(cat,name){
+  const sec=secOf(cat);
+  return '<nav class="crumbs"><a href="#">Shop</a><span>/</span><a href="#sec-'+esc(sec.key)+'">'+esc(sec.title)+'</a><span>/</span><b>'+esc(name)+'</b></nav>';
+}
+
+function trustRow(p){
+  const tee=p&&p.category==='apparel';
+  return '<ul class="assure">'
+    +'<li><b>'+(tee||(p&&p.delivery_included)?'Delivery included':'Free delivery over '+money(FREE_DELIVERY))+'</b><span>Across India, with a tracking link</span></li>'
+    +'<li><b>'+(tee?'Secure online payment':(ORDERS_OPEN?'Cash on delivery':'Secure checkout'))+'</b><span>'+(tee?'UPI, card or net banking by CCAvenue':'Pay the way you like')+'</span></li>'
+    +'<li><b>Sold by Rooster Club</b><span>Packed and shipped from Hyderabad</span></li>'
+    +'<li><b>Real people on WhatsApp</b><span><a href="https://wa.me/'+WA+'">95153 69756</a></span></li></ul>';
+}
+
+function related(p){
+  const r=(PRODUCTS||[]).filter(x=>x.category===p.category&&x.id!==p.id).slice(0,4);
+  return r.length?'<section class="more"><div class="shead row"><h2>You may also like</h2><a href="#sec-'+esc(p.category)+'">See all</a></div><div class="pgrid">'+r.map(card).join('')+'</div></section>':'';
+}
+
+/* Phone only: a bar that stays at the bottom with the price and the main button. */
+function stickyBar(name,priceText){
+  const prim=main.querySelector('[data-primary]'); if(!prim) return;
+  const bar=document.createElement('div'); bar.className='sbar';
+  const dis=prim.disabled;
+  bar.innerHTML='<div class="sbar-t"><b>'+esc(name)+'</b><span>'+esc(priceText)+'</span></div><button class="btn">'+esc(dis?'Pick a size':(prim.textContent||'Buy now').trim())+'</button>';
+  bar.querySelector('button').onclick=()=>{ if(dis){const t=main.querySelector('.sizes');if(t)t.scrollIntoView({behavior:'smooth',block:'center'});} else prim.click(); };
+  main.appendChild(bar);
+  if('IntersectionObserver' in window){ const io=new IntersectionObserver(es=>es.forEach(e=>bar.classList.toggle('on',!e.isIntersecting&&e.boundingClientRect.top<0)));io.observe(prim); }
+  else bar.classList.add('on');
+}
+
 function listPage(){
   document.title='Rooster Club Shop — Poultry Accessories, Supplements, Laddus & Apparel';
-  const secs=SECTIONS.map(sec=>{
+  const tees=PRODUCTS.filter(p=>p.category==='apparel');
+  const heroImgs=tees.map(p=>pics(p)[0]).filter(Boolean).slice(0,3);
+  const catList=SECTIONS.filter(sec=>PRODUCTS.some(p=>p.category===sec.key)||comingOf(sec.key).length).map(sec=>{
     const items=PRODUCTS.filter(p=>p.category===sec.key), soon=comingOf(sec.key);
-    return '<section class="ssec" id="sec-'+sec.key+'"><div class="shead"><h2>'+esc(sec.title)+'</h2><p>'+esc(sec.sub)+'</p></div>'
+    const img=(items[0]&&pics(items[0])[0])||(soon[0]&&soon[0].img)||'';
+    const n=items.length+soon.length;
+    return '<a class="cat" href="#sec-'+sec.key+'" data-jump="sec-'+sec.key+'"><div class="cimg">'+(img?'<img src="'+esc(img)+'" alt="" loading="lazy">':'')+'</div>'
+      +'<b>'+esc(sec.title)+'</b><span>'+n+(n===1?' item':' items')+'</span></a>';
+  });
+  const order=SECTIONS.filter(x=>x.key==='apparel').concat(SECTIONS.filter(x=>x.key!=='apparel'));
+  const secs=order.map(sec=>{
+    const items=PRODUCTS.filter(p=>p.category===sec.key), soon=comingOf(sec.key);
+    return '<section class="ssec" id="sec-'+sec.key+'"><div class="shead"><p class="kicker">'+(sec.key==='apparel'?'Order now':(ORDERS_OPEN?'In stock':'Orders open soon'))+'</p><h2>'+esc(sec.title)+'</h2><p>'+esc(sec.sub)+'</p></div>'
       +(items.length||soon.length?'<div class="pgrid">'+items.map(card).join('')+soon.map(soonCard).join('')+'</div>'
-        +(sec.buy?'':'<p class="appnote">Pick your style, colour and size. Printed for you and paid online.</p>')
         :'<div class="soon"><b>Coming soon</b><span>We are getting these ready. <a href="https://wa.me/'+WA+'?text='+encodeURIComponent('Hi, tell me when '+sec.title+' are available in the Rooster Club Shop.')+'">Tell me when they arrive</a></span></div>')
       +'</section>';
   }).join('');
-  main.innerHTML='<section class="shop-hero"><div class="wrap">'
-    +'<p class="eyebrow">Rooster Club Shop</p>'
-    +'<h1>Everything for your birds, delivered to your farm</h1>'
-    +(ORDERS_OPEN?'<p class="lead"><b>Cash on delivery</b> across India. Free delivery on orders of '+money(FREE_DELIVERY)+' or more.</p>':'<p class="lead">Rooster Club T-shirts can be ordered now. Other items open for orders soon.</p>')
-    +'<nav class="chipnav">'+SECTIONS.map(sec=>'<a href="#sec-'+sec.key+'" data-jump="sec-'+sec.key+'">'+esc(sec.title)+'</a>').join('')+'</nav>'
+  const faq=[
+    ['How long does delivery take?','Most orders reach you in 4–8 days. Printed T-shirts are made for you, so they take 5–7 days to print and ship. You get a tracking link as soon as your parcel leaves.'],
+    ['How do I pay?',ORDERS_OPEN?'Pay online (UPI, card or net banking) or pay cash when the parcel arrives. T-shirts are paid online only.':'T-shirts are paid online by UPI, card or net banking through CCAvenue, a secure payment company. Other items open for orders soon.'],
+    ['Can I track my order?','Yes. After you order you get a page with your order status. You can open it again any time from "My orders" on the same phone, or WhatsApp us your order number.'],
+    ['What if something is wrong with my order?','WhatsApp us a photo on 95153 69756 and we will sort it out. Read our <a href="/refund-policy.html">refund policy</a> and <a href="/shipping-policy.html">delivery policy</a>.']
+  ];
+  main.innerHTML='<section class="hero2"><div class="wrap hero2-in">'
+      +'<div class="hero2-txt"><p class="kicker">New · Rooster Club Apparel</p>'
+      +'<h1>Wear the rooster.</h1>'
+      +'<p class="lead">Heavy cotton T-shirts printed with Aseel and rooster art, made for the people who keep them. Printed for you and delivered across India.</p>'
+      +'<div class="hero2-cta"><a class="btn big" href="#sec-apparel" data-jump="sec-apparel">Shop T-shirts</a><a class="btn ghost big" href="#cats" data-jump="cats">All products</a></div>'
+      +'<p class="fine">'+(tees.length?'From '+money(Math.min.apply(null,tees.map(teeFrom)))+' · ':'')+'Delivery included · Secure online payment</p></div>'
+      +'<div class="hero2-pics n'+heroImgs.length+'">'+heroImgs.map((u,i)=>'<img src="'+esc(u)+'" alt="Rooster Club T-shirt" '+(i?'loading="lazy"':'fetchpriority="high"')+'>').join('')+'</div>'
     +'</div></section>'
-    +'<div class="wrap">'+secs
-    +'<div class="trust">'+(ORDERS_OPEN?'<div><b>Cash on delivery</b><span>Pay when the parcel reaches you</span></div>':'')
-    +'<div><b>Sold by Rooster Club</b><span>Packed and shipped from Hyderabad</span></div>'
-    +'<div><b>Help on WhatsApp</b><span><a href="https://wa.me/'+WA+'">95153 69756</a></span></div></div></div>';
+    +'<div class="band"><div class="wrap band-in"><span><b>Delivery across India</b></span><span><b>Sold &amp; shipped by Rooster Club</b>, Hyderabad</span><span><b>Help on WhatsApp</b> 95153 69756</span></div></div>'
+    +'<div class="wrap">'
+    +'<section class="ssec" id="cats"><div class="shead"><p class="kicker">Shop by category</p><h2>Everything for your birds</h2></div><div class="cats" style="--n:'+catList.length+'">'+catList.join('')+'</div></section>'
+    +secs
+    +'<section class="story"><div class="story-in"><p class="kicker">Our story</p><h2>Made by keepers, for keepers.</h2>'
+      +'<p>Rooster Club started as an app where country-chicken and Aseel keepers buy and sell birds. This shop sells the things our members kept asking for, chosen by a team with a background in animal nutrition and feed.</p>'
+      +'<p>Every order is packed and shipped by us from Hyderabad. If you need help, you talk to a real person on WhatsApp.</p>'
+      +'<a class="btn ghost" href="/about.html">About Rooster Club</a></div></section>'
+    +'<section class="ssec"><div class="shead"><p class="kicker">Simple</p><h2>How ordering works</h2></div><ol class="how">'
+      +'<li><b>Pick</b><span>Choose your item'+(tees.length?', style, colour and size':'')+'. No account needed.</span></li>'
+      +'<li><b>Pay</b><span>'+(ORDERS_OPEN?'Online or cash on delivery.':'Pay online by UPI, card or net banking.')+'</span></li>'
+      +'<li><b>Get it</b><span>We ship it to your door and send you a tracking link.</span></li></ol></section>'
+    +'<section class="ssec faqs"><div class="shead"><p class="kicker">Questions</p><h2>Good to know</h2></div>'
+      +faq.map(f=>'<details class="faq"><summary>'+esc(f[0])+'</summary><p>'+f[1]+'</p></details>').join('')+'</section>'
+    +'<section class="appband"><div><p class="kicker">Rooster Club app</p><h2>Buy and sell birds with keepers near you</h2><p>Listings, chat, Rooster School and Breeder Pro — free on Android.</p></div><a class="btn big" href="'+PLAY+'">Get the app</a></section>'
+    +'</div>';
   main.querySelectorAll('[data-jump]').forEach(a=>a.onclick=e=>{e.preventDefault();const t=document.getElementById(a.dataset.jump);if(t)t.scrollIntoView({behavior:'smooth'});});
 }
 
@@ -239,27 +306,29 @@ async function teePage(p){
   function paint(){
     const t=types[ti], c=t?t.colours[ci]:null, imgs=imgsFor();
     const sizes=c?(c.sizes||[]):[], sz=sizes.find(x=>x.size===size);
-    main.innerHTML='<div class="wrap"><a class="back" href="#">← Back to the shop</a>'
+    main.innerHTML='<div class="wrap">'+crumbs('apparel',p.name)
     +'<div class="pdetail"><div class="gallery">'
-      +'<div class="gmain"><img id="gmain" src="'+esc(imgs[0])+'" alt="'+esc(p.name)+'"></div>'
+      +'<div class="gmain cover"><img id="gmain" src="'+esc(imgs[0])+'" alt="'+esc(p.name)+'"></div>'
       +(imgs.length>1?'<div class="gthumbs">'+imgs.map((u,i)=>'<button class="gthumb'+(i?'':' on')+'" data-src="'+esc(u)+'"><img src="'+esc(u)+'" alt=""></button>').join('')+'</div>':'')
     +'</div><div class="pinfo">'
-      +'<span class="pbadge static app">Printed for you · pay online</span>'
+      +'<span class="stamp static dark">Printed for you · pay online</span>'
       +'<h1>'+esc(p.name)+'</h1>'
       +(a.benefit?'<p class="psub">'+esc(a.benefit)+'</p>':'')
       +(t?'<div class="price big"><b>'+money(t.price)+'</b></div><p class="incl">Delivery included · printed and shipped in 5–7 days</p>':'')
       +(!types.length?'<div class="appbox"><p>This design is not open for orders right now.</p><a class="btn" href="'+PLAY+'">Get the Rooster Club app</a></div>':
         '<h2>Style</h2><div class="chips">'+types.map((x,i)=>'<button class="chip'+(i===ti?' on':'')+'" data-t="'+i+'">'+esc(x.label)+' <small>'+money(x.price)+'</small></button>').join('')+'</div>'
         +'<h2>Colour'+(c?': <span class="muted">'+esc(c.name)+'</span>':'')+'</h2><div class="swatches">'+t.colours.map((x,i)=>'<button class="sw'+(i===ci?' on':'')+'" data-c="'+i+'" title="'+esc(x.name)+'" aria-label="'+esc(x.name)+'" style="background:'+esc(/^#[0-9a-f]{3,8}$/i.test(x.hex||'')?x.hex:'#ccc')+'"></button>').join('')+'</div>'
-        +'<h2>Size</h2><div class="chips">'+sizes.map(x=>'<button class="chip'+(x.size===size?' on':'')+'" data-s="'+esc(x.size)+'">'+esc(x.size)+'</button>').join('')+'</div>'
+        +'<h2>Size</h2><div class="chips sizes">'+sizes.map(x=>'<button class="chip'+(x.size===size?' on':'')+'" data-s="'+esc(x.size)+'">'+esc(x.size)+'</button>').join('')+'</div>'
         +'<div class="buy"><div class="qty"><button data-q="-1" aria-label="Less">−</button><span id="q">'+qty+'</span><button data-q="1" aria-label="More">+</button></div>'
-        +(TEES?'<button class="btn" id="teebuy"'+(sz?'':' disabled')+'>'+(sz?'Buy now · '+money(t.price*qty):'Pick a size')+'</button>'
+        +(TEES?'<button class="btn" id="teebuy" data-primary'+(sz?'':' disabled')+'>'+(sz?'Buy now · '+money(t.price*qty):'Pick a size')+'</button>'
                :'<button class="btn" disabled>Orders open soon</button>')+'</div>'
         +(TEES?'<p class="fine">Paid online (UPI, card or net banking). No cash on delivery for printed T-shirts.</p>'
                :'<p class="fine">Online payment opens soon. Until then you can order in the <a href="'+PLAY+'">Rooster Club app</a>.</p>'))
       +(p.description?'<p class="desc">'+esc(p.description)+'</p>':'')
+      +trustRow(p)
       +((a.fabric||a.print||a.neck)?'<h2>Details</h2><ul class="ticks">'+[a.print,t&&t.gsm?t.gsm+' GSM':'',a.fabric,a.neck,a.made_in?'Made in '+a.made_in:''].filter(Boolean).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'')
-    +'</div></div></div>';
+    +'</div></div>'+related(p)+'</div>';
+    if(t) stickyBar(p.name,money(t.price*qty));
     main.querySelectorAll('.gthumb').forEach(b=>b.onclick=()=>{document.getElementById('gmain').src=b.dataset.src;main.querySelectorAll('.gthumb').forEach(x=>x.classList.toggle('on',x===b));});
     main.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{ti=+b.dataset.t;ci=0;size='';paint();});
     main.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{ci=+b.dataset.c;const ok=(types[ti].colours[ci].sizes||[]).some(x=>x.size===size);if(!ok)size='';paint();});
@@ -283,32 +352,34 @@ function productPage(id){
   const d=det(p), imgs=pics(p), ok=inStock(p), max=Math.min(MAX_QTY,p.stock_count||0);
   const list=(title,arr)=>arr&&arr.length?'<h2>'+title+'</h2><ul class="ticks">'+arr.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'';
   const kit=(d.kit_ids||[]).map(byId).filter(Boolean);
-  main.innerHTML='<div class="wrap"><a class="back" href="#">← Back to the shop</a>'
+  main.innerHTML='<div class="wrap">'+crumbs(p.category,p.name)
     +'<div class="pdetail"><div class="gallery">'
       +'<div class="gmain"><img id="gmain" src="'+esc(imgs[0])+'" alt="'+esc(p.name)+'"></div>'
       +(imgs.length>1?'<div class="gthumbs">'+imgs.map((u,i)=>'<button class="gthumb'+(i?'':' on')+'" data-src="'+esc(u)+'"><img src="'+esc(u)+'" alt=""></button>').join('')+'</div>':'')
     +'</div><div class="pinfo">'
-      +(BADGES[d.badge]?'<span class="pbadge static">'+esc(BADGES[d.badge])+'</span>':'')
+      +(BADGES[d.badge]?'<span class="stamp static">'+esc(BADGES[d.badge])+'</span>':'')
       +'<h1>'+esc(p.name)+'</h1>'+(p.name_te?'<p class="te">'+esc(p.name_te)+'</p>':'')
       +(d.subtitle?'<p class="psub">'+esc(d.subtitle)+'</p>':'')
-      +priceBlock(p,true)
+      +priceBlock(p,true)+rating(p)
       +'<p class="incl">'+(p.delivery_included?'Delivery included':'Free delivery on orders of '+money(FREE_DELIVERY)+'+, else '+money(DELIVERY_FEE))+(ORDERS_OPEN?' · Cash on delivery':'')+'</p>'
-      +(!ORDERS_OPEN?'<div class="appbox"><p>Orders for this item open soon. Ask us on WhatsApp and we will tell you when you can order.</p><a class="btn" href="https://wa.me/'+WA+'?text='+encodeURIComponent('Hi, please tell me when I can order '+p.name+'.')+'">Ask on WhatsApp</a></div>'
+      +(!ORDERS_OPEN?'<div class="appbox"><p>Orders for this item open soon. Ask us on WhatsApp and we will tell you when you can order.</p><a class="btn" data-primary href="https://wa.me/'+WA+'?text='+encodeURIComponent('Hi, please tell me when I can order '+p.name+'.')+'">Ask on WhatsApp</a></div>'
         :ok?'<div class="buy"><div class="qty"><button data-q="-1" aria-label="Less">−</button><span id="q">1</span><button data-q="1" aria-label="More">+</button></div>'
-          +'<button class="btn ghost" id="add">Add to cart</button><button class="btn" id="now">Buy now</button></div>'
+          +'<button class="btn ghost" id="add">Add to cart</button><button class="btn" id="now" data-primary>Buy now</button></div>'
           +(p.stock_count<=5?'<p class="few">Only '+p.stock_count+' left</p>':'')
         :'<p class="oosnote">Out of stock right now. <a href="https://wa.me/'+WA+'?text='+encodeURIComponent('Hi, please tell me when '+p.name+' is back in stock.')+'">Ask on WhatsApp</a></p>')
       +'<ul class="facts">'
         +(d.ships_days?'<li>Ships in '+d.ships_days+(d.ships_days===1?' day':' days')+'</li>':'')
         +(d.warranty?'<li>'+esc(d.warranty)+' warranty</li>':'')
         +'<li>Sold by Rooster Club, Hyderabad</li></ul>'
+      +trustRow(p)
       +(p.description?'<p class="desc">'+esc(p.description)+'</p>':'')
       +(kit.length?'<h2>What the kit has</h2><ul class="kit">'+kit.map(k=>'<li><a href="#p/'+esc(k.id)+'">'+esc(k.name)+'</a> <span>'+money(k.price)+'</span></li>').join('')+'</ul>':'')
       +list('Good for',d.good_for)+list('In the box',d.box)
       +(d.specs&&d.specs.length?'<h2>Details</h2><table class="specs">'+d.specs.map(r=>'<tr><th>'+esc(r[0])+'</th><td>'+esc(r[1])+'</td></tr>').join('')+'</table>':'')
       +(d.steps&&d.steps.length?'<h2>How to use</h2><ol class="steps-ol">'+d.steps.map(s=>'<li>'+esc(s)+'</li>').join('')+'</ol>':'')
       +(d.faq&&d.faq.length?'<h2>Questions</h2>'+d.faq.map(f=>'<details class="faq"><summary>'+esc(f.q)+'</summary><p>'+esc(f.a)+'</p></details>').join(''):'')
-    +'</div></div></div>';
+    +'</div></div>'+related(p)+'</div>';
+  stickyBar(p.name,money(p.price));
   main.querySelectorAll('.gthumb').forEach(b=>b.onclick=()=>{document.getElementById('gmain').src=b.dataset.src;main.querySelectorAll('.gthumb').forEach(x=>x.classList.toggle('on',x===b));});
   if(ok&&ORDERS_OPEN){
     let q=1; const qEl=document.getElementById('q');
@@ -511,6 +582,7 @@ async function route(){
     else if(h==='cart') cartPage();
     else if(h==='checkout') checkoutPage(false);
     else if(h==='checkout/tee') checkoutPage(true);
+    else if((m=h.match(/^(sec-[a-z_]+|cats)$/))){ listPage(); const t=document.getElementById(m[1]); if(t) setTimeout(()=>t.scrollIntoView(),0); }
     else listPage();
   }catch(e){
     main.innerHTML='<div class="wrap narrow"><div class="box center"><h1>The shop could not load</h1><p class="muted">Check your internet and try again.</p><button class="btn" onclick="location.reload()">Try again</button></div></div>';

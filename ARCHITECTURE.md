@@ -104,3 +104,4 @@ saved in localStorage key 'rc-web-cart-v2' (old 'rc-web-cart-v1' is read once an
   Secrets needed: CCAV_MERCHANT_ID, CCAV_ACCESS_CODE, CCAV_WORKING_KEY (optional CCAV_ENV=test).
   Also fixed expire_unpaid_shop_orders crashing on website orders (no buyer). Command Center Orders
   page shows "PAID online · do NOT collect cash".
+- 28 Nov 2026 — Shop 3.0 redesign done inside the CURRENT shop (assets/shop.js + shop.css v4, shop/index.html), not the Next.js rebuild. New home (T-shirt hero, category tiles, story, how-to-order, FAQ, app band), breadcrumbs, trust boxes, 'You may also like', phone sticky buy bar, WhatsApp help button. Orders, CCAvenue and the T-shirts-only rule are unchanged.
