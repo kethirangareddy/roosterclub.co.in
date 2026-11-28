@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Rooster Club brand tokens (same as the main website styles.css) */
+@theme {
+  --color-brand: #b8701a;
+  --color-brand-dark: #7b3f00;
+  --color-gold: #d6a24a;
+  --color-gold-soft: #f3dfb4;
+  --color-cream: #fbf6ef;
+  --color-cream-2: #f5ecdf;
+  --color-line: #eadfcd;
+  --color-ink: #24160c;
+  --color-ink-2: #4a3424;
+  --color-muted: #7a6550;
+  --color-leaf: #2f6b3a;
+  --color-leaf-bg: #e6f1e3;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-te: "Noto Sans Telugu", "Nirmala UI", sans-serif;
+  --shadow-card: 0 1px 2px rgba(58,36,16,.06), 0 6px 18px -8px rgba(58,36,16,.16);
+  --shadow-lift: 0 2px 4px rgba(58,36,16,.06), 0 24px 48px -18px rgba(58,36,16,.32);
+}
+
+html { -webkit-tap-highlight-color: transparent; }
+body { background: var(--color-cream); color: var(--color-ink); font-family: var(--font-sans); }
+.wrap { max-width: 1160px; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; border-radius:999px; font-weight:700; min-height:48px; padding:0 1.4rem; transition: background .15s, transform .15s; }
+.btn-primary { background: var(--color-brand); color:#fff; }
+.btn-primary:hover { background: var(--color-brand-dark); }
+.btn-ghost { background:#fff; color: var(--color-ink); border:1px solid var(--color-line); }
+.btn:active { transform: scale(.98); }
